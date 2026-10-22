@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Automated Web Scanner — Website Security Configuration Checker</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <!-- Chart.js for data visualization -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <svg class="brand-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+        <div>
+          <h1 class="brand-title">Automated Web Scanner</h1>
+          <p class="brand-subtitle">Website Security Analysis & Monitoring</p>
+        </div>
+      </div>
+      <div class="header-tag">Educational Cybersecurity Project</div>
+    </div>
+  </header>
+
+  <main class="main-container">
+
+    <!-- Scan Input Card -->
+    <section class="card input-card">
+      <h2 class="section-title">Enter Target Website URL</h2>
+      <p class="section-desc">
+        Perform a defensive HTTP security header audit and SSL/TLS configuration check.
+        Only scan web assets you own or have explicit authorization to test.
+      </p>
+
+      <form id="scanForm" class="scan-form">
+        <div class="input-group">
+          <input 
+            type="text" 
+            id="urlInput" 
+            class="url-input" 
+            placeholder="e.g., https://example.com" 
+            required 
+            autocomplete="off"
+            spellcheck="false"
+          >
+          <button type="submit" id="scanBtn" class="btn btn-primary">
+            <span class="btn-text">Scan Website</span>
+          </button>
+        </div>
+      </form>
+
+      <!-- Quick sample test links -->
+      <div class="quick-samples">
+        <span class="samples-label">Quick Test Targets:</span>
+        <button type="button" class="sample-link" data-url="https://www.wikipedia.org">Wikipedia (Hardened)</button>
+        <button type="button" class="sample-link" data-url="http://neverssl.com">NeverSSL (Plain HTTP)</button>
+        <button type="button" class="sample-link danger" data-url="http://127.0.0.1:8080">127.0.0.1 (SSRF Test)</button>
+        <button type="button" class="sample-link danger" data-url="http://192.168.1.1">192.168.1.1 (Private IP)</button>
+      </div>
+
+      <!-- Error / Alert Message Container -->
+      <div id="alertBox" class="alert-box" style="display: none;">
+        <div class="alert-content">
+          <strong id="alertTitle">Alert:</strong>
+          <span id="alertMessage"></span>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div id="loadingIndicator" class="loading-container" style="display: none;">
+        <div class="spinner"></div>
+        <p class="loading-text">Resolving DNS & Auditing HTTP Security Headers...</p>
+        <span class="loading-sub">Validating destination IP against SSRF blocklist</span>
+      </div>
+    </section>
+
+    <!-- Results Section (Initially Hidden) -->
+    <section id="resultsSection" class="results-section" style="display: none;">
+
+      <!-- Summary Metrics Bar -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-label">Total Checks</span>
+          <span class="stat-value font-mono" id="statTotalChecks">8</span>
+          <span class="stat-sub">Header & SSL rules</span>
+        </div>
+        <div class="stat-card passed">
+          <span class="stat-label">Headers Present</span>
+          <span class="stat-value font-mono" id="statHeadersPresent">0</span>
+          <span class="stat-sub text-green">Passed checks</span>
+        </div>
+        <div class="stat-card missing">
+          <span class="stat-label">Headers Missing</span>
+          <span class="stat-value font-mono" id="statHeadersMissing">0</span>
+          <span class="stat-sub text-red">Action needed</span>
+        </div>
+        <div class="stat-card" id="statHttpsCard">
+          <span class="stat-label">HTTPS Encryption</span>
+          <span class="stat-value" id="statHttps">Checking...</span>
+          <span class="stat-sub" id="statHttpsSub">Transport layer</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Overall Posture</span>
+          <span class="stat-value text-amber" id="statVerdict">Analyzing</span>
+          <span class="stat-sub" id="statTime">0 ms</span>
+        </div>
+      </div>
+
+      <!-- Two Column Layout: Chart & Server Metadata -->
+      <div class="two-col-grid">
+        <!-- Security Header Distribution Chart -->
+        <div class="card chart-card">
+          <h3 class="card-title">Security Header Compliance Ratio</h3>
+          <div class="chart-wrapper">
+            <canvas id="headerComplianceChart"></canvas>
+          </div>
+          <div class="chart-legend-text">
+            Visual breakdown of headers present versus missing on target response.
+          </div>
+        </div>
+
+        <!-- Server & Transport Diagnostics -->
+        <div class="card diagnostics-card">
+          <h3 class="card-title">Server Response & Transport Diagnostics</h3>
+          <ul class="diag-list font-mono">
+            <li>
+              <span class="diag-key">Target URL:</span>
+              <span class="diag-val" id="diagUrl">-</span>
+            </li>
+            <li>
+              <span class="diag-key">Final Destination:</span>
+              <span class="diag-val" id="diagFinalUrl">-</span>
+            </li>
+            <li>
+              <span class="diag-key">HTTP Status:</span>
+              <span class="diag-val" id="diagStatus">-</span>
+            </li>
+            <li>
+              <span class="diag-key">Response Time:</span>
+              <span class="diag-val" id="diagResponseTime">-</span>
+            </li>
+            <li>
+              <span class="diag-key">Resolved Public IP:</span>
+              <span class="diag-val" id="diagResolvedIp">-</span>
+            </li>
+            <li>
+              <span class="diag-key">Content-Type:</span>
+              <span class="diag-val" id="diagContentType">-</span>
+            </li>
+            <li>
+              <span class="diag-key">Server Header:</span>
+              <span class="diag-val" id="diagServer">-</span>
+            </li>
+          </ul>
+
+          <div class="https-callout" id="httpsCallout">
+            <h4 class="callout-title">HTTPS Security Context:</h4>
+            <p id="httpsExplanation" class="callout-text"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Security Header Results Table -->
+      <div class="card table-card">
+        <div class="card-header-flex">
+          <h3 class="card-title">HTTP Security Headers Audit</h3>
+          <span class="table-counter">6 Key Headers Evaluated</span>
+        </div>
+        <div class="table-responsive">
+          <table class="security-table">
+            <thead>
+              <tr>
+                <th style="width: 25%;">Header Name</th>
+                <th style="width: 15%;">Status</th>
+                <th style="width: 35%;">Observed Value / Recommendation</th>
+                <th style="width: 25%;">Security Purpose</th>
+              </tr>
+            </thead>
+            <tbody id="headersTableBody">
+              <!-- Dynamically populated via script.js -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Findings and Recommendations -->
+      <div class="two-col-grid">
+        <div class="card findings-card">
+          <h3 class="card-title">Security Findings</h3>
+          <ul id="findingsList" class="findings-list">
+            <!-- Populated via script.js -->
+          </ul>
+        </div>
+        <div class="card recommendations-card">
+          <h3 class="card-title">Actionable Recommendations</h3>
+          <ul id="recommendationsList" class="recommendations-list">
+            <!-- Populated via script.js -->
+          </ul>
+        </div>
+      </div>
+
+      <!-- Report Export Actions -->
+      <div class="card export-card">
+        <div class="export-flex">
+          <div>
+            <h3 class="card-title">Download Security Audit Report</h3>
+            <p class="section-desc">Export the complete findings as an audit artifact for academic or review purposes.</p>
+          </div>
+          <div class="export-buttons">
+            <button id="downloadTxtBtn" class="btn btn-secondary">Download TXT Report</button>
+            <button id="downloadJsonBtn" class="btn btn-secondary">Download JSON Report</button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Educational Footer -->
+  <footer class="app-footer">
+    <div class="footer-container">
+      <p>Automated Web Scanner — Educational Cybersecurity Mini Project</p>
+      <p class="footer-sub">
+        Designed strictly for defensive website security analysis and educational testing.
+        Status indicators represent basic configuration audits, not a complete security assessment.
+      </p>
+    </div>
+  </footer>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "name": "Automated Web Scanner — Cybersecurity Mini Project",
+  "description": "Defensive website security configuration scanner auditing HTTP security headers (CSP, HSTS, X-Frame-Options, etc.), HTTPS status, and server response data with strict SSRF protection.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
